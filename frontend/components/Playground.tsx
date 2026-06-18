@@ -2,7 +2,16 @@
 
 import { useState, useEffect, useRef } from "react";
 import { Bot, ChevronDown, FileText, Send } from "lucide-react";
-import { Message, suggestions, mockAnswers, defaultAnswer } from "@/app/data/portfolio";
+import { AnswerPayload, Message, suggestions } from "@/app/data/portfolio";
+
+const CHAT_API_URL =
+  process.env.NEXT_PUBLIC_CHAT_API_URL ?? "http://127.0.0.1:8000";
+
+const errorPayload: AnswerPayload = {
+  answer:
+    "I couldn't reach the portfolio chatbot backend. Please try again in a moment.",
+  sources: [],
+};
 
 export default function Playground() {
   const [messages, setMessages] = useState<Message[]>([
@@ -21,17 +30,11 @@ export default function Playground() {
     chatEndRef.current?.scrollIntoView({ behavior: "smooth", block: "end" });
   }, [messages, streaming]);
 
-  function sendMessage(text?: string) {
-    const content = (text ?? input).trim();
-    if (!content || streaming) return;
-    setInput("");
-    setMessages((m) => [...m, { role: "user", content, sources: null }]);
-    setStreaming(true);
-
-    const payload = mockAnswers[content] ?? defaultAnswer;
+  function streamAssistantResponse(payload: AnswerPayload) {
     let i = 0;
     const full = payload.answer;
     setMessages((m) => [...m, { role: "assistant", content: "", sources: null }]);
+
     const step = () => {
       i += Math.max(2, Math.round(full.length / 90));
       setMessages((m) => {
@@ -40,6 +43,7 @@ export default function Playground() {
         copy[copy.length - 1] = { ...last, content: full.slice(0, i) };
         return copy;
       });
+
       if (i < full.length) {
         setTimeout(step, 18);
       } else {
@@ -53,10 +57,46 @@ export default function Playground() {
           return copy;
         });
         setStreaming(false);
-        setSourcesOpen(true);
+        setSourcesOpen(payload.sources.length > 0);
       }
     };
-    setTimeout(step, 180);
+
+    setTimeout(step, 120);
+  }
+
+  async function sendMessage(text?: string) {
+    const content = (text ?? input).trim();
+    if (!content || streaming) return;
+    setInput("");
+    setSourcesOpen(false);
+    setStreaming(true);
+
+    const userMessage: Message = { role: "user", content, sources: null };
+    const history = messages
+      .filter((m) => m.content.trim())
+      .map(({ role, content }) => ({ role, content }));
+
+    setMessages((m) => [...m, userMessage]);
+
+    try {
+      const response = await fetch(`${CHAT_API_URL}/chat`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          message: content,
+          history,
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error(`Chat request failed with status ${response.status}`);
+      }
+
+      const payload = (await response.json()) as AnswerPayload;
+      streamAssistantResponse(payload);
+    } catch {
+      streamAssistantResponse(errorPayload);
+    }
   }
 
   return (
@@ -211,7 +251,7 @@ export default function Playground() {
               </button>
             </form>
             <p className="mt-2 text-[11px] font-mono text-stone-600">
-              prototype · mock responses · real version runs LangChain + Neo4j + Gemini
+              live RAG · FastAPI · Neo4j · Gemini via LiteLLM
             </p>
           </div>
         </div>
