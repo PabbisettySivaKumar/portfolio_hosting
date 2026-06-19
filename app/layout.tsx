@@ -18,9 +18,9 @@ export const metadata: Metadata = {
   description:
     "AI Engineer specializing in RAG pipelines, LLM orchestration, and multi-agent architectures. Currently building AI products at Dotkonnekt.",
   icons: {
-    icon: "/icon.png?v=1",
-    shortcut: "/favicon.ico?v=1",
-    apple: "/icon.png?v=1",
+    icon: "/icon.png?v=2",
+    shortcut: "/favicon.ico?v=2",
+    apple: "/icon.png?v=2",
   },
 };
 
