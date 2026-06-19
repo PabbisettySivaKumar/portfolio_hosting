@@ -14,7 +14,7 @@ const jetbrainsMono = JetBrains_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Siva Kumar — AI Engineer Portfolio",
+  title: "Siva Kumar - AI Engineer",
   description:
     "AI Engineer specializing in RAG pipelines, LLM orchestration, and multi-agent architectures. Currently building AI products at Dotkonnekt.",
 };
