@@ -24,7 +24,7 @@ export default function Playground() {
   ]);
   const [input, setInput] = useState("");
   const [streaming, setStreaming] = useState(false);
-  const [sourcesOpen, setSourcesOpen] = useState(false);
+  const [openSources, setOpenSources] = useState<Record<number, boolean>>({});
   const chatEndRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -35,7 +35,6 @@ export default function Playground() {
     const content = (text ?? input).trim();
     if (!content || streaming) return;
     setInput("");
-    setSourcesOpen(false);
     setStreaming(true);
 
     const userMessage: Message = { role: "user", content, sources: null };
@@ -119,7 +118,6 @@ export default function Playground() {
         return copy;
       });
       setStreaming(false);
-      setSourcesOpen(sources.length > 0);
 
     } catch (err) {
       console.error(err);
@@ -236,16 +234,16 @@ export default function Playground() {
                   {m.role === "assistant" && m.sources && m.sources.length > 0 && (
                     <div className="mt-3 pt-3 border-t border-stone-800">
                       <button
-                        onClick={() => setSourcesOpen((o) => !o)}
+                        onClick={() => setOpenSources((prev) => ({ ...prev, [i]: !prev[i] }))}
                         className="flex items-center gap-1.5 text-[11px] font-mono uppercase tracking-wider text-stone-500 hover:text-stone-300 transition-colors"
                       >
                         <FileText className="w-3 h-3" />
                         Retrieved sources ({m.sources.length})
                         <ChevronDown
-                          className={`w-3 h-3 transition-transform ${sourcesOpen ? "rotate-180" : ""}`}
+                          className={`w-3 h-3 transition-transform ${openSources[i] ? "rotate-180" : ""}`}
                         />
                       </button>
-                      {sourcesOpen && (
+                      {openSources[i] && (
                         <div className="mt-3 space-y-2">
                           {m.sources.map((s, si) => (
                             <div
