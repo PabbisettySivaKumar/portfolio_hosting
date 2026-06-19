@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef } from "react";
 import { Bot, ChevronDown, FileText, Send } from "lucide-react";
+import ReactMarkdown from "react-markdown";
 import { AnswerPayload, Message, suggestions } from "@/app/data/portfolio";
 
 const CHAT_API_URL =
@@ -197,13 +198,40 @@ export default function Playground() {
                       : "bg-stone-950/60 border border-stone-800 text-stone-200"
                   }`}
                 >
-                  <span
-                    className={
-                      streaming && i === messages.length - 1 && m.role === "assistant" ? "caret" : ""
-                    }
-                  >
-                    {m.content}
-                  </span>
+                  {m.role === "assistant" ? (
+                    <div
+                      className={
+                        streaming && i === messages.length - 1 ? "caret" : ""
+                      }
+                    >
+                      <ReactMarkdown
+                        components={{
+                          p: ({ children }) => <p className="mb-2 last:mb-0 leading-relaxed">{children}</p>,
+                          ul: ({ children }) => <ul className="list-disc pl-5 mb-2 space-y-1">{children}</ul>,
+                          ol: ({ children }) => <ol className="list-decimal pl-5 mb-2 space-y-1">{children}</ol>,
+                          li: ({ children }) => <li className="leading-relaxed">{children}</li>,
+                          strong: ({ children }) => <strong className="font-semibold text-stone-100">{children}</strong>,
+                          h1: ({ children }) => <h1 className="text-lg font-bold text-stone-100 mt-3 mb-1">{children}</h1>,
+                          h2: ({ children }) => <h2 className="text-base font-bold text-stone-100 mt-2 mb-1">{children}</h2>,
+                          h3: ({ children }) => <h3 className="text-sm font-bold text-stone-100 mt-2 mb-1">{children}</h3>,
+                          a: ({ href, children }) => (
+                            <a href={href} target="_blank" rel="noopener noreferrer" className="text-amber-500 hover:underline">
+                              {children}
+                            </a>
+                          ),
+                          code: ({ children }) => (
+                            <code className="bg-stone-900 px-1.5 py-0.5 rounded font-mono text-xs text-amber-500">
+                              {children}
+                            </code>
+                          ),
+                        }}
+                      >
+                        {m.content}
+                      </ReactMarkdown>
+                    </div>
+                  ) : (
+                    <span>{m.content}</span>
+                  )}
 
                   {m.role === "assistant" && m.sources && m.sources.length > 0 && (
                     <div className="mt-3 pt-3 border-t border-stone-800">
