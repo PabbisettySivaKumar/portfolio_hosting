@@ -17,6 +17,11 @@ export const metadata: Metadata = {
   title: "Siva Kumar - AI Engineer",
   description:
     "AI Engineer specializing in RAG pipelines, LLM orchestration, and multi-agent architectures. Currently building AI products at Dotkonnekt.",
+  icons: {
+    icon: "/icon.png?v=1",
+    shortcut: "/favicon.ico?v=1",
+    apple: "/icon.png?v=1",
+  },
 };
 
 export default function RootLayout({
