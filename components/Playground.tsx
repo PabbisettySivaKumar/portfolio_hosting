@@ -30,40 +30,6 @@ export default function Playground() {
     chatEndRef.current?.scrollIntoView({ behavior: "smooth", block: "end" });
   }, [messages, streaming]);
 
-  function streamAssistantResponse(payload: AnswerPayload) {
-    let i = 0;
-    const full = payload.answer;
-    setMessages((m) => [...m, { role: "assistant", content: "", sources: null }]);
-
-    const step = () => {
-      i += Math.max(2, Math.round(full.length / 90));
-      setMessages((m) => {
-        const copy = [...m];
-        const last = copy[copy.length - 1];
-        copy[copy.length - 1] = { ...last, content: full.slice(0, i) };
-        return copy;
-      });
-
-      if (i < full.length) {
-        setTimeout(step, 18);
-      } else {
-        setMessages((m) => {
-          const copy = [...m];
-          copy[copy.length - 1] = {
-            ...copy[copy.length - 1],
-            content: full,
-            sources: payload.sources,
-          };
-          return copy;
-        });
-        setStreaming(false);
-        setSourcesOpen(payload.sources.length > 0);
-      }
-    };
-
-    setTimeout(step, 120);
-  }
-
   async function sendMessage(text?: string) {
     const content = (text ?? input).trim();
     if (!content || streaming) return;
@@ -77,6 +43,9 @@ export default function Playground() {
       .map(({ role, content }) => ({ role, content }));
 
     setMessages((m) => [...m, userMessage]);
+
+    // Add assistant message placeholder
+    setMessages((m) => [...m, { role: "assistant", content: "", sources: null }]);
 
     try {
       const response = await fetch(`${CHAT_API_URL}/chat`, {
@@ -92,10 +61,77 @@ export default function Playground() {
         throw new Error(`Chat request failed with status ${response.status}`);
       }
 
-      const payload = (await response.json()) as AnswerPayload;
-      streamAssistantResponse(payload);
-    } catch {
-      streamAssistantResponse(errorPayload);
+      if (!response.body) {
+        throw new Error("No readable stream in response");
+      }
+
+      const reader = response.body.getReader();
+      const decoder = new TextDecoder();
+      let done = false;
+      let answer = "";
+      let sources: { title: string; snippet: string }[] = [];
+
+      let buffer = "";
+      while (!done) {
+        const { value, done: readerDone } = await reader.read();
+        done = readerDone;
+        if (value) {
+          buffer += decoder.decode(value, { stream: !done });
+          const lines = buffer.split("\n");
+          // Keep the last partial line in the buffer
+          buffer = lines.pop() ?? "";
+          
+          for (const line of lines) {
+            if (!line.trim()) continue;
+            try {
+              const parsed = JSON.parse(line);
+              if (parsed.type === "token") {
+                answer += parsed.content;
+                setMessages((m) => {
+                  const copy = [...m];
+                  copy[copy.length - 1] = {
+                    ...copy[copy.length - 1],
+                    content: answer,
+                  };
+                  return copy;
+                });
+              } else if (parsed.type === "sources") {
+                sources = parsed.sources;
+              } else if (parsed.type === "error") {
+                throw new Error(parsed.content);
+              }
+            } catch (e) {
+              console.error("Failed to parse stream line:", e);
+            }
+          }
+        }
+      }
+
+      // Final update with sources
+      setMessages((m) => {
+        const copy = [...m];
+        copy[copy.length - 1] = {
+          ...copy[copy.length - 1],
+          content: answer,
+          sources: sources,
+        };
+        return copy;
+      });
+      setStreaming(false);
+      setSourcesOpen(sources.length > 0);
+
+    } catch (err) {
+      console.error(err);
+      setMessages((m) => {
+        const copy = [...m];
+        copy[copy.length - 1] = {
+          ...copy[copy.length - 1],
+          content: errorPayload.answer,
+          sources: [],
+        };
+        return copy;
+      });
+      setStreaming(false);
     }
   }
 
