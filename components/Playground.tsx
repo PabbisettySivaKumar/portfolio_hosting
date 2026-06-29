@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
-import { Bot, ChevronDown, FileText, Send } from "lucide-react";
+import { Bot, ChevronDown, FileText, Send, Square } from "lucide-react";
 import ReactMarkdown from "react-markdown";
 import { AnswerPayload, Message, suggestions } from "@/app/data/portfolio";
 
@@ -31,10 +31,25 @@ export default function Playground() {
   const [streaming, setStreaming] = useState(false);
   const [openSources, setOpenSources] = useState<Record<number, boolean>>({});
   const chatEndRef = useRef<HTMLDivElement>(null);
+  const abortControllerRef = useRef<AbortController | null>(null);
 
   useEffect(() => {
     chatEndRef.current?.scrollIntoView({ behavior: "smooth", block: "end" });
   }, [messages, streaming]);
+
+  useEffect(() => {
+    return () => {
+      if (abortControllerRef.current) {
+        abortControllerRef.current.abort();
+      }
+    };
+  }, []);
+
+  function stopGeneration() {
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+    }
+  }
 
   async function sendMessage(text?: string) {
     const content = (text ?? input).trim();
@@ -52,6 +67,9 @@ export default function Playground() {
     // Add assistant message placeholder
     setMessages((m) => [...m, { role: "assistant", content: "", sources: null }]);
 
+    const controller = new AbortController();
+    abortControllerRef.current = controller;
+
     try {
       const response = await fetch(`${CHAT_API_URL}/chat`, {
         method: "POST",
@@ -60,6 +78,7 @@ export default function Playground() {
           message: content,
           history,
         }),
+        signal: controller.signal,
       });
 
       if (!response.ok) {
@@ -137,19 +156,35 @@ export default function Playground() {
       }
       updateAssistant();
 
-    } catch (err) {
-      console.error(err);
-      setMessages((m) => {
-        const copy = [...m];
-        copy[copy.length - 1] = {
-          ...copy[copy.length - 1],
-          content: errorPayload.answer,
-          sources: [],
-        };
-        return copy;
-      });
+    } catch (err: any) {
+      if (err.name === "AbortError") {
+        setMessages((m) => {
+          const copy = [...m];
+          const lastMsg = copy[copy.length - 1];
+          if (lastMsg && lastMsg.role === "assistant") {
+            if (!lastMsg.content) {
+              lastMsg.content = "_Generation stopped by user._";
+            } else {
+              lastMsg.content += "\n\n_Generation stopped by user._";
+            }
+          }
+          return copy;
+        });
+      } else {
+        console.error(err);
+        setMessages((m) => {
+          const copy = [...m];
+          copy[copy.length - 1] = {
+            ...copy[copy.length - 1],
+            content: errorPayload.answer,
+            sources: [],
+          };
+          return copy;
+        });
+      }
     } finally {
       setStreaming(false);
+      abortControllerRef.current = null;
     }
   }
 
@@ -322,14 +357,25 @@ export default function Playground() {
                 placeholder="ask about projects, stack, availability…"
                 className="flex-1 bg-transparent outline-none text-sm text-stone-100 placeholder:text-stone-600 font-mono"
               />
-              <button
-                type="submit"
-                disabled={!input.trim() || streaming}
-                className="flex items-center justify-center w-9 h-9 rounded-md bg-amber-500 hover:bg-amber-400 text-stone-950 disabled:opacity-40 disabled:cursor-not-allowed transition"
-                aria-label="Send"
-              >
-                <Send className="w-4 h-4" />
-              </button>
+              {streaming ? (
+                <button
+                  type="button"
+                  onClick={stopGeneration}
+                  className="flex items-center justify-center w-9 h-9 rounded-md bg-rose-600 hover:bg-rose-500 text-stone-100 transition animate-pulse"
+                  aria-label="Stop generation"
+                >
+                  <Square className="w-3.5 h-3.5 fill-current" />
+                </button>
+              ) : (
+                <button
+                  type="submit"
+                  disabled={!input.trim()}
+                  className="flex items-center justify-center w-9 h-9 rounded-md bg-amber-500 hover:bg-amber-400 text-stone-950 disabled:opacity-40 disabled:cursor-not-allowed transition"
+                  aria-label="Send"
+                >
+                  <Send className="w-4 h-4" />
+                </button>
+              )}
             </form>
             <p className="mt-2 text-[11px] font-mono text-stone-600">
               live RAG · FastAPI · Neo4j · Gemini via LiteLLM
