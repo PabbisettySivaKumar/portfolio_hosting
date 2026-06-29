@@ -26,7 +26,7 @@ export type AnswerPayload = {
 
 export const suggestions = [
   "What experience does Siva have with LangChain?",
-  "Tell me about the Reddit Analytics Pipeline",
+  "Tell me about the AI Powered Reddit Analytics Pipeline",
   "What's Siva's experience with multi-agent systems?",
   "Is Siva available for AI engineer roles?",
 ];
