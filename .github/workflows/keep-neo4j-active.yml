@@ -1,0 +1,27 @@
+name: Keep Neo4j Aura active
+
+on:
+  schedule:
+    - cron: "17 6 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  keepalive:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Run Neo4j keepalive query
+        env:
+          KEEPALIVE_TOKEN: ${{ secrets.NEO4J_KEEPALIVE_TOKEN }}
+        run: |
+          test -n "$KEEPALIVE_TOKEN"
+          curl --fail --show-error --silent \
+            --retry 3 \
+            --retry-all-errors \
+            --max-time 90 \
+            --request POST \
+            --header "Authorization: Bearer ${KEEPALIVE_TOKEN}" \
+            https://psk95-portfolio-rag-api.hf.space/health/neo4j

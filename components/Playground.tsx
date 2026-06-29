@@ -14,6 +14,11 @@ const errorPayload: AnswerPayload = {
   sources: [],
 };
 
+type StreamEvent =
+  | { type: "token"; content: string }
+  | { type: "sources"; sources: { title: string; snippet: string }[] }
+  | { type: "error"; content: string };
+
 export default function Playground() {
   const [messages, setMessages] = useState<Message[]>([
     {
@@ -71,6 +76,43 @@ export default function Playground() {
       let answer = "";
       let sources: { title: string; snippet: string }[] = [];
 
+      const updateAssistant = () => {
+        setMessages((currentMessages) => {
+          const copy = [...currentMessages];
+          copy[copy.length - 1] = {
+            ...copy[copy.length - 1],
+            content: answer,
+            sources,
+          };
+          return copy;
+        });
+      };
+
+      const processStreamLine = (line: string) => {
+        if (!line.trim()) return;
+
+        try {
+          const parsed = JSON.parse(line) as StreamEvent | AnswerPayload;
+
+          // Keep compatibility with the original non-streaming API response.
+          if ("answer" in parsed) {
+            answer = parsed.answer;
+            sources = parsed.sources ?? [];
+          } else if (parsed.type === "token") {
+            answer += parsed.content;
+          } else if (parsed.type === "sources") {
+            sources = parsed.sources;
+          } else if (parsed.type === "error") {
+            answer = parsed.content || errorPayload.answer;
+            sources = [];
+          }
+
+          updateAssistant();
+        } catch (parseError) {
+          console.error("Failed to parse chat stream line:", parseError);
+        }
+      };
+
       let buffer = "";
       while (!done) {
         const { value, done: readerDone } = await reader.read();
@@ -82,42 +124,18 @@ export default function Playground() {
           buffer = lines.pop() ?? "";
           
           for (const line of lines) {
-            if (!line.trim()) continue;
-            try {
-              const parsed = JSON.parse(line);
-              if (parsed.type === "token") {
-                answer += parsed.content;
-                setMessages((m) => {
-                  const copy = [...m];
-                  copy[copy.length - 1] = {
-                    ...copy[copy.length - 1],
-                    content: answer,
-                  };
-                  return copy;
-                });
-              } else if (parsed.type === "sources") {
-                sources = parsed.sources;
-              } else if (parsed.type === "error") {
-                throw new Error(parsed.content);
-              }
-            } catch (e) {
-              console.error("Failed to parse stream line:", e);
-            }
+            processStreamLine(line);
           }
         }
       }
 
-      // Final update with sources
-      setMessages((m) => {
-        const copy = [...m];
-        copy[copy.length - 1] = {
-          ...copy[copy.length - 1],
-          content: answer,
-          sources: sources,
-        };
-        return copy;
-      });
-      setStreaming(false);
+      processStreamLine(buffer);
+
+      if (!answer.trim()) {
+        answer =
+          "The chatbot backend returned an empty response. Please try again.";
+      }
+      updateAssistant();
 
     } catch (err) {
       console.error(err);
@@ -130,6 +148,7 @@ export default function Playground() {
         };
         return copy;
       });
+    } finally {
       setStreaming(false);
     }
   }
