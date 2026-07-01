@@ -54,12 +54,12 @@ export default function Header() {
             className="flex items-center gap-2.5 group"
             aria-label="Home"
           >
-            <div className="relative w-8 h-8 rounded-md overflow-hidden bg-stone-900 border border-stone-800 flex items-center justify-center shadow-[0_0_24px_-6px_rgba(245,158,11,0.4)] group-hover:shadow-[0_0_28px_-4px_rgba(245,158,11,0.6)] transition-shadow">
+            <div className="relative w-[38px] h-[38px] rounded-md overflow-hidden bg-stone-900 border border-stone-800 flex items-center justify-center shadow-[0_0_24px_-6px_rgba(245,158,11,0.4)] group-hover:shadow-[0_0_28px_-4px_rgba(245,158,11,0.6)] transition-shadow">
               <img
                 src="/icon.png?v=6"
                 alt="Logo"
-                width={32}
-                height={32}
+                width={38}
+                height={38}
                 className="object-cover w-full h-full"
               />
             </div>
