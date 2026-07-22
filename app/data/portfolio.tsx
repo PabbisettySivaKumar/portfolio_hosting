@@ -152,10 +152,10 @@ export const experience = [
   {
     role: "AI Engineer Intern",
     company: "Dotkonnekt",
-    period: "Nov 2025 — Present",
+    period: "Nov 2025 — Mar 2026",
     description: "Building production agentic AI systems: RAG pipelines, multi-agent orchestration with LangChain/LangGraph, and observability with Langfuse.",
     icon: Briefcase,
-    current: true,
+    current: false,
   },
   {
     role: "Generative AI Engineer, Workshop",
