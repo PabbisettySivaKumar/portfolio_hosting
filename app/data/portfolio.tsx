@@ -17,6 +17,7 @@ export type Message = {
   role: string;
   content: string;
   sources: { title: string; snippet: string }[] | null;
+  traceId?: string | null;
 };
 
 export type AnswerPayload = {

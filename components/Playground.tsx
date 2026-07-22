@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
-import { Bot, ChevronDown, FileText, Send, Square } from "lucide-react";
+import { Bot, ChevronDown, FileText, Send, Square, ThumbsUp, ThumbsDown } from "lucide-react";
 import ReactMarkdown from "react-markdown";
 import { AnswerPayload, Message, suggestions } from "@/app/data/portfolio";
 
@@ -15,6 +15,7 @@ const errorPayload: AnswerPayload = {
 };
 
 type StreamEvent =
+  | { type: "trace"; trace_id: string }
   | { type: "token"; content: string }
   | { type: "sources"; sources: { title: string; snippet: string }[] }
   | { type: "error"; content: string };
@@ -25,13 +26,38 @@ export default function Playground() {
       role: "assistant",
       content: "Hi! Ask me anything about Siva's experience, projects, or skills.",
       sources: null,
+      traceId: null,
     },
   ]);
   const [input, setInput] = useState("");
   const [streaming, setStreaming] = useState(false);
   const [openSources, setOpenSources] = useState<Record<number, boolean>>({});
+  const [feedback, setFeedback] = useState<Record<number, "up" | "down">>({});
   const chatEndRef = useRef<HTMLDivElement>(null);
   const abortControllerRef = useRef<AbortController | null>(null);
+  const sessionIdRef = useRef<string>("");
+
+  // Stable id used to group this conversation's traces in Langfuse. Persisted in
+  // sessionStorage so it survives reloads within the same tab.
+  function getSessionId() {
+    if (sessionIdRef.current) return sessionIdRef.current;
+    let sid = "";
+    try {
+      sid = sessionStorage.getItem("chat_session_id") ?? "";
+    } catch {
+      // sessionStorage may be unavailable (private mode / SSR); fall through.
+    }
+    if (!sid) {
+      sid = crypto.randomUUID();
+      try {
+        sessionStorage.setItem("chat_session_id", sid);
+      } catch {
+        // Ignore write failures; the in-memory ref still keeps it stable.
+      }
+    }
+    sessionIdRef.current = sid;
+    return sid;
+  }
 
   useEffect(() => {
     chatEndRef.current?.scrollIntoView({ behavior: "smooth", block: "end" });
@@ -51,6 +77,24 @@ export default function Playground() {
     }
   }
 
+  async function sendFeedback(
+    messageIndex: number,
+    traceId: string,
+    value: "up" | "down"
+  ) {
+    // Optimistically reflect the choice; keep it even if the network call fails.
+    setFeedback((prev) => ({ ...prev, [messageIndex]: value }));
+    try {
+      await fetch(`${CHAT_API_URL}/feedback`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ trace_id: traceId, value }),
+      });
+    } catch (err) {
+      console.error("Failed to submit feedback:", err);
+    }
+  }
+
   async function sendMessage(text?: string) {
     const content = (text ?? input).trim();
     if (!content || streaming) return;
@@ -65,7 +109,10 @@ export default function Playground() {
     setMessages((m) => [...m, userMessage]);
 
     // Add assistant message placeholder
-    setMessages((m) => [...m, { role: "assistant", content: "", sources: null }]);
+    setMessages((m) => [
+      ...m,
+      { role: "assistant", content: "", sources: null, traceId: null },
+    ]);
 
     const controller = new AbortController();
     abortControllerRef.current = controller;
@@ -77,6 +124,7 @@ export default function Playground() {
         body: JSON.stringify({
           message: content,
           history,
+          session_id: getSessionId(),
         }),
         signal: controller.signal,
       });
@@ -94,6 +142,7 @@ export default function Playground() {
       let done = false;
       let answer = "";
       let sources: { title: string; snippet: string }[] = [];
+      let traceId: string | null = null;
 
       const updateAssistant = () => {
         setMessages((currentMessages) => {
@@ -102,6 +151,7 @@ export default function Playground() {
             ...copy[copy.length - 1],
             content: answer,
             sources,
+            traceId,
           };
           return copy;
         });
@@ -117,6 +167,8 @@ export default function Playground() {
           if ("answer" in parsed) {
             answer = parsed.answer;
             sources = parsed.sources ?? [];
+          } else if (parsed.type === "trace") {
+            traceId = parsed.trace_id;
           } else if (parsed.type === "token") {
             answer += parsed.content;
           } else if (parsed.type === "sources") {
@@ -156,8 +208,8 @@ export default function Playground() {
       }
       updateAssistant();
 
-    } catch (err: any) {
-      if (err.name === "AbortError") {
+    } catch (err) {
+      if (err instanceof Error && err.name === "AbortError") {
         setMessages((m) => {
           const copy = [...m];
           const lastMsg = copy[copy.length - 1];
@@ -317,6 +369,43 @@ export default function Playground() {
                       )}
                     </div>
                   )}
+
+                  {m.role === "assistant" &&
+                    m.traceId &&
+                    !(streaming && i === messages.length - 1) && (
+                      <div className="mt-3 pt-3 border-t border-stone-800 flex items-center gap-2">
+                        <span className="text-[11px] font-mono uppercase tracking-wider text-stone-600">
+                          Helpful?
+                        </span>
+                        <button
+                          onClick={() => sendFeedback(i, m.traceId ?? "", "up")}
+                          aria-label="Helpful"
+                          className={`p-1.5 rounded-md border transition-colors ${
+                            feedback[i] === "up"
+                              ? "border-amber-500/60 text-amber-400 bg-amber-500/10"
+                              : "border-stone-800 text-stone-500 hover:text-stone-300 hover:border-stone-700"
+                          }`}
+                        >
+                          <ThumbsUp className="w-3.5 h-3.5" />
+                        </button>
+                        <button
+                          onClick={() => sendFeedback(i, m.traceId ?? "", "down")}
+                          aria-label="Not helpful"
+                          className={`p-1.5 rounded-md border transition-colors ${
+                            feedback[i] === "down"
+                              ? "border-rose-500/60 text-rose-400 bg-rose-500/10"
+                              : "border-stone-800 text-stone-500 hover:text-stone-300 hover:border-stone-700"
+                          }`}
+                        >
+                          <ThumbsDown className="w-3.5 h-3.5" />
+                        </button>
+                        {feedback[i] && (
+                          <span className="text-[11px] font-mono text-stone-600">
+                            Thanks for the feedback!
+                          </span>
+                        )}
+                      </div>
+                    )}
                 </div>
                 {m.role === "user" && (
                   <div className="flex-shrink-0 w-8 h-8 rounded-md bg-stone-800 border border-stone-700 flex items-center justify-center">
