@@ -76,6 +76,7 @@ port/                              (plain folder, NOT a git repo)
         cache.py
         chunking.py
         guardrails.py
+        ingest.py            (content -> Neo4j sync; run on startup + via CLI)
         llm.py
         neo4j_client.py
         observability.py
@@ -261,25 +262,47 @@ LinkedIn: https://linkedin.com/in/sivakumar644
 GitHub: https://github.com/PabbisettySivaKumar
 ```
 
-### 6. Ingestion script
+### 6. Ingestion (auto on startup + manual CLI)
 
-File:
+Files:
 
 ```txt
-portfolio-rag-api/scripts/ingest.py
+portfolio-rag-api/app/rag/ingest.py    # core logic (driver-safe, importable)
+portfolio-rag-api/scripts/ingest.py    # thin CLI wrapper around the core
 ```
 
-What it does:
+The core lives in `app/rag/ingest.py` as `ingest_content()` so it can run both
+from the CLI and from inside the running app. `scripts/ingest.py` is just a CLI
+wrapper that calls it and then closes the driver.
 
-- Reads `portfolio-rag-api/content/*.md`
-- Skips `README.md`
+What `ingest_content()` does:
+
+- Reads `portfolio-rag-api/content/*.md` (skips `README.md`)
 - Chunks markdown text (`app/rag/chunking.py`)
-- Embeds chunks using LiteLLM/Gemini
-- Drops and recreates the Neo4j vector index
-- Deletes old `DocumentChunk` nodes
-- Writes new chunk nodes into Neo4j
+- **Incremental / hash-based**: hashes each file and compares against the
+  `file_hash` stored on `DocumentChunk` nodes in Neo4j:
+  - new file → embed + insert
+  - modified file (hash changed) → delete its old chunks + re-embed
+  - deleted file → remove its chunks
+  - unchanged → **skipped** (a single Neo4j read, no embedding calls)
+- Ensures the vector index exists (`CREATE VECTOR INDEX ... IF NOT EXISTS`)
+- Writes new `DocumentChunk` nodes (with `file_hash` + `ingested_at`)
+- Uses the shared app Neo4j driver and **never closes it** (safe in-app)
 
-Run locally:
+**Auto-ingest on startup:** `app/main.py`'s lifespan fires `ingest_content()`
+as a **background task** (`asyncio.create_task`) so uvicorn starts serving
+immediately, then syncs content → Neo4j a moment later. Any failure is
+**logged and swallowed** (`_startup_ingest`) — ingestion never crashes the app.
+Because it's hash-based, cold starts with no content change cost ~nothing.
+
+So the normal flow is now: **edit `content/*.md` → push → Space rebuilds →
+auto-syncs on boot.** No manual step required.
+
+Caveat: this is safe on the **single-replica free Space**. If the Space is ever
+scaled to >1 replica, concurrent boots could race on the delete/create — revisit
+then (e.g. a lock or move ingestion to a one-shot job).
+
+Manual run (still available, e.g. to sync from your laptop without a redeploy):
 
 ```bash
 cd portfolio-rag-api
@@ -623,6 +646,8 @@ portfolio-rag-api/app/rag/retrieval.py
 portfolio-rag-api/app/rag/llm.py
 portfolio-rag-api/app/rag/cache.py
 portfolio-rag-api/app/rag/observability.py
+portfolio-rag-api/app/rag/ingest.py
+portfolio-rag-api/app/main.py
 portfolio-rag-api/scripts/ingest.py
 portfolio-rag-api/Dockerfile
 portfolio-rag-api/README.md
