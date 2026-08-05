@@ -4,6 +4,32 @@ This document summarizes the current state of the portfolio project so another A
 assistant or developer can continue from here. It reflects the **actual on-disk
 layout** as of the latest update.
 
+## Update (2026-08-05) — read this first
+
+The backend has advanced significantly since the bulk of this doc was written.
+**`portfolio-rag-api/HANDOFF.md` is now the authoritative reference for the
+backend** — this file is kept for the frontend + overall topology. Key changes:
+
+- **Guardrail** is no longer a bare keyword allowlist — it's a keyword fast-path
+  plus an LLM scope classifier (natural questions like "who are you?" work).
+- **Chunking** is section-aware (structural markdown), not fixed-width.
+- **Prompts** are managed in Langfuse (with local fallbacks); seed via
+  `scripts/seed_langfuse_prompts.py`.
+- **`/chat` is rate-limited** to 20 req/min per IP (`app/rate_limit.py`).
+- **CORS cannot be enforced on HF Spaces** — the platform proxy injects
+  permissive CORS that overrides `FRONTEND_ORIGIN`. Rate limiting is the actual
+  abuse control. (See the CORS note under Backend below.)
+- **New admin endpoints** (token-guarded): `POST /admin/ingest?force=true`
+  (force re-embed) and `GET /admin/config` (inspect effective config).
+- **Neo4j pool hardened** against Aura idle resets (liveness + lifetime).
+- **`RAG_MIN_SCORE` tuned to 0.80** (data-driven via `evals/run_eval.py --sweep`).
+- **Eval harness** added under `evals/` — local gate, in-process Langfuse dataset
+  run, and a black-box run against the deployed Space.
+- Model defaults: chat `gemini/gemini-3.1-flash-lite`, fallback
+  `gemini/gemini-2.5-flash` (the older listing below had these reversed).
+- The backend git remote no longer embeds a token (the security item below is
+  resolved).
+
 ## Project Goal
 
 Build and deploy a full-stack AI portfolio with:
@@ -69,9 +95,12 @@ port/                              (plain folder, NOT a git repo)
       main.py
       config.py
       models.py
+      rate_limit.py          (per-IP limiter + X-Forwarded-For client IP helper)
       routes/
         chat.py
         health.py
+        feedback.py
+        admin.py             (/admin/ingest, /admin/config; token-guarded)
       rag/
         cache.py
         chunking.py
@@ -82,6 +111,7 @@ port/                              (plain folder, NOT a git repo)
         observability.py
         prompts.py
         retrieval.py
+    evals/                   (dataset.json + run_eval.py, langfuse_dataset.py, run_eval_http.py)
     content/
       profile.md
       experience.md
@@ -92,8 +122,10 @@ port/                              (plain folder, NOT a git repo)
       README.md
     scripts/
       ingest.py
+      seed_langfuse_prompts.py     (push prompt defaults to Langfuse)
     venv/                          (local virtualenv, gitignored)
     Dockerfile
+    HANDOFF.md                     (authoritative backend reference)
     README.md                      (Hugging Face Space metadata + description)
     requirements.txt
     .env                           (gitignored)
@@ -169,17 +201,24 @@ Main app:
 portfolio-rag-api/app/main.py
 ```
 
-CORS is locked to the `FRONTEND_ORIGIN` env var. The Neo4j driver is closed on
-shutdown via the lifespan handler.
+CORS is configured from `FRONTEND_ORIGIN` (single value or comma-separated
+list), **but note: on Hugging Face Spaces the platform's edge proxy injects its
+own permissive CORS headers that override the app config** — so the origin
+allowlist is not actually enforced in production. This is a platform limitation,
+not a bug; the config is correct and would apply on a host that owns the edge.
+Abuse is instead capped by per-IP rate limiting on `/chat`. The Neo4j driver is
+closed on shutdown via the lifespan handler.
 
 Routes:
 
 ```txt
-GET  /             -> service status
-GET  /health       -> {"status": "ok"}
-POST /health/neo4j -> token-authed, rate-limited Neo4j keepalive
-POST /chat         -> streaming RAG chat (NDJSON)
-POST /feedback     -> record a thumbs up/down Langfuse score for a trace
+GET  /              -> service status
+GET  /health        -> {"status": "ok"}
+POST /health/neo4j  -> token-authed, rate-limited Neo4j keepalive
+POST /chat          -> streaming RAG chat (NDJSON), rate-limited 20/min per IP
+POST /feedback      -> record a thumbs up/down Langfuse score for a trace
+POST /admin/ingest  -> token-authed content re-ingest (?force=true re-embeds all)
+GET  /admin/config  -> token-authed; returns non-sensitive effective config
 ```
 
 ### 3. Gemini through LiteLLM
@@ -204,8 +243,8 @@ Relevant env vars (see `app/config.py` for defaults):
 ```env
 GEMINI_API_KEY=
 LITELLM_EMBEDDING_MODEL=gemini/gemini-embedding-001
-LITELLM_CHAT_MODEL=gemini/gemini-2.5-flash
-LITELLM_FALLBACK_MODEL=gemini/gemini-3.1-flash-lite
+LITELLM_CHAT_MODEL=gemini/gemini-3.1-flash-lite     # primary
+LITELLM_FALLBACK_MODEL=gemini/gemini-2.5-flash      # fallback
 ```
 
 ### 4. Neo4j AuraDB integration
@@ -324,14 +363,17 @@ Flow:
 
 ```txt
 receive {message, history}
-  -> check in-memory query cache (app/rag/cache.py)
+  -> rate-limit per client IP (429 before any LLM work; app/rate_limit.py)
   -> condense question using history (falls back to raw question on failure)
+  -> check in-memory query cache on the normalized condensed question
   -> guardrail check on the condensed question (app/rag/guardrails.py)
   -> embed condensed question
   -> vector search Neo4j (top_k, filtered by RAG_MIN_SCORE)
   -> stream sources, then answer tokens generated by Gemini via LiteLLM
   -> cache the completed answer + sources
 ```
+
+(History is capped to the most recent turns before condensing/answering.)
 
 The response is a streamed **NDJSON** body (`application/x-ndjson`), one JSON
 object per line. Event types:
@@ -349,9 +391,11 @@ can reference the trace id when submitting feedback.
 The frontend also still tolerates a legacy non-streaming
 `{"answer": "...", "sources": [...]}` shape for backward compatibility.
 
-Guardrails (`app/rag/guardrails.py`) use a keyword allowlist so the bot only
-answers questions about Siva's profile, projects, skills, education, contact,
-experience, and availability.
+Guardrails (`app/rag/guardrails.py`) keep the bot on-topic (Siva's profile,
+projects, skills, education, contact, experience, availability). A keyword
+fast-path accepts obvious matches immediately; anything else is sent to an LLM
+scope classifier (fails open), so natural phrasings like "who are you?" are
+handled instead of being wrongly rejected.
 
 ### 8. Neo4j keepalive (anti-cold-start)
 
@@ -524,18 +568,27 @@ LANGFUSE_SECRET_KEY=        # from your Langfuse Cloud project
 
 Add as variables or secrets:
 
+Tuning knobs have safe code defaults in `app/config.py` — prefer leaving them
+unset in the Space so code stays the single source of truth:
+
 ```env
 LITELLM_EMBEDDING_MODEL=gemini/gemini-embedding-001
-LITELLM_CHAT_MODEL=gemini/gemini-2.5-flash
-LITELLM_FALLBACK_MODEL=gemini/gemini-3.1-flash-lite
-RAG_TOP_K=5                 # note: code default is 10 if unset
-RAG_MIN_SCORE=0.72
-FRONTEND_ORIGIN=https://your-vercel-domain.vercel.app
+LITELLM_CHAT_MODEL=gemini/gemini-3.1-flash-lite      # primary (code default)
+LITELLM_FALLBACK_MODEL=gemini/gemini-2.5-flash       # fallback (code default)
+RAG_TOP_K=10                # code default
+RAG_MIN_SCORE=0.80          # code default (tuned via evals --sweep)
+FRONTEND_ORIGIN=https://sivakumar.dev,https://www.sivakumar.dev
 LANGFUSE_ENABLED=true       # false (or unset) disables all tracing
 LANGFUSE_HOST=https://cloud.langfuse.com   # or https://us.cloud.langfuse.com
 ```
 
-During local testing, `FRONTEND_ORIGIN` can be `http://localhost:3000`.
+Notes:
+- `FRONTEND_ORIGIN` accepts a comma-separated list. Both the apex and `www`
+  serve the site (`pabbisettysivakumar.in` 301-redirects to `www`). **But** see
+  the CORS caveat above — HF Spaces overrides this, so it's not enforced in prod.
+- Env-var changes on the Space require a **Factory reboot** to take effect (a
+  plain restart doesn't reliably re-inject them). Verify with `GET /admin/config`.
+- During local testing, `FRONTEND_ORIGIN` can be `http://localhost:3000`.
 
 ### Vercel frontend
 
@@ -574,36 +627,28 @@ cd portfolio-rag-api
 git push origin main
 ```
 
-## SECURITY: exposed Hugging Face token (UNRESOLVED)
+## SECURITY: exposed Hugging Face token (RESOLVED)
 
-The `portfolio-rag-api` git `origin` URL currently has a Hugging Face **write
-token embedded in it** (visible via `git remote -v`). This is exactly the leak
-the earlier handoff warned about, and it is still present.
-
-Action required:
-
-1. Revoke/rotate the token: https://huggingface.co/settings/tokens
-2. Remove the token from the remote URL:
+The `portfolio-rag-api` git `origin` no longer embeds a token — it is now the
+clean URL `https://huggingface.co/spaces/psk95/portfolio-rag-api` (verified via
+`git remote -v`). Pushes authenticate via a credential helper / one-off token
+rather than a token baked into the remote. If you ever need to re-auth:
 
 ```bash
-cd portfolio-rag-api
-git remote set-url origin https://huggingface.co/spaces/psk95/portfolio-rag-api
+git push https://psk95:NEW_HF_TOKEN@huggingface.co/spaces/psk95/portfolio-rag-api main
 ```
 
-3. Authenticate pushes with a credential helper or a one-off token instead of
-   baking it into `origin`:
+If a token was previously committed anywhere, rotate it at
+https://huggingface.co/settings/tokens as a precaution.
 
-```bash
-git push --force-with-lease \
-  https://psk95:NEW_HF_TOKEN@huggingface.co/spaces/psk95/portfolio-rag-api main
-```
+## Status & optional next steps
 
-## Next Steps
+Both services are **deployed and verified live**: backend on the HF Space,
+frontend on Vercel at `sivakumar.dev`/`www.sivakumar.dev`, Space secrets set
+(incl. `KEEPALIVE_TOKEN` and `FRONTEND_ORIGIN`), keepalive cron active, and the
+eval harness passing against both local and the deployed Space.
 
-1. Rotate the exposed Hugging Face token and scrub it from the `origin` URL.
-2. Push the backend Space repo and wait for the build.
-3. Confirm Hugging Face Space secrets/variables (including `KEEPALIVE_TOKEN`).
-4. Verify:
+Smoke-test the deployed backend anytime:
 
 ```bash
 curl https://psk95-portfolio-rag-api.hf.space/health
@@ -613,10 +658,11 @@ curl -X POST https://psk95-portfolio-rag-api.hf.space/chat \
   -d '{"message":"What projects has Siva built?","history":[]}'
 ```
 
-5. In Vercel, set `NEXT_PUBLIC_CHAT_API_URL` to the Space URL.
-6. Set the backend `FRONTEND_ORIGIN` to the final Vercel URL.
-7. Add the `KEEPALIVE_TOKEN` secret to GitHub Actions for the keepalive workflow.
-8. Redeploy both if needed.
+Deferred / optional (not needed at current single-container scale):
+
+- Redis-backed cache + rate limiter (only if the Space scales to >1 replica).
+- Inline answer citations (map shown sources to specific claims).
+- Batched embedding in ingest (negligible at the current corpus size).
 
 ## Validation Already Done
 
