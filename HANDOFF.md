@@ -412,6 +412,10 @@ siva-portfolio/.github/workflows/keep-neo4j-active.yml
 This requires the `KEEPALIVE_TOKEN` env var on the backend (must be >= 32 chars,
 enforced in `app/config.py`) and a matching secret for the workflow.
 
+> [!NOTE]
+> **Troubleshooting 401 Unauthorized errors:**
+> If the keepalive GitHub Actions workflow fails with a `401` error, it means the `NEO4J_KEEPALIVE_TOKEN` secret in the frontend repository settings does not match the `KEEPALIVE_TOKEN` environment variable on the Hugging Face Space backend. Both must match exactly (e.g. `aGZt4lRbKeMyfA6dQ7forI1QfDVS81Aw6kdDtpVK6UnRtiLKtLxMASCTv1qKqipE`). Note that the backend expects a `Bearer` token format, which the GitHub Action's curl command handles automatically by prepending `Bearer ` before the token.
+
 ### 9. Observability (Langfuse)
 
 LLM tracing is provided by **Langfuse Cloud** (not self-hosted). All wiring lives
