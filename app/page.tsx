@@ -10,6 +10,20 @@ import Experience from "@/components/Experience";
 import Contact from "@/components/Contact";
 
 export default function Portfolio() {
+  // Fire-and-forget: silently notify on first page load. Never blocks render.
+  useEffect(() => {
+    fetch("/api/visit", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        pageUrl: window.location.href,
+        referrer: document.referrer || "Direct",
+      }),
+    }).catch(() => {
+      // Ignore all errors — notification is best-effort
+    });
+  }, []);
+
   useEffect(() => {
     const els = document.querySelectorAll("[data-reveal]");
     const io = new IntersectionObserver(

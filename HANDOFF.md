@@ -596,10 +596,12 @@ Notes:
 
 ### Vercel frontend
 
-Set only:
+Set the following in Vercel:
 
 ```env
 NEXT_PUBLIC_CHAT_API_URL=https://psk95-portfolio-rag-api.hf.space
+RESEND_API_KEY=re_...         # from https://resend.com — get a free API key
+NOTIFY_EMAIL=pabbisettyssivakumar@gmail.com  # where notifications go
 ```
 
 Do not put Gemini or Neo4j secrets in the Vercel frontend env vars.
@@ -667,6 +669,38 @@ Deferred / optional (not needed at current single-container scale):
 - Redis-backed cache + rate limiter (only if the Space scales to >1 replica).
 - Inline answer citations (map shown sources to specific claims).
 - Batched embedding in ingest (negligible at the current corpus size).
+
+### 11. Visitor Email Notifications
+
+Every time someone visits the portfolio, a silent email is sent to `pabbisettyssivakumar@gmail.com`.
+
+Key files:
+
+```txt
+siva-portfolio/app/api/visit/route.ts  ← API route that sends the email
+siva-portfolio/app/page.tsx            ← fires a fire-and-forget POST on mount
+```
+
+How it works:
+- `page.tsx` fires `POST /api/visit` invisibly on first mount (`useEffect`, `[]`). The
+  visitor never sees anything.
+- The API route reads the `X-Forwarded-For` header to get the client IP, calls
+  `https://ipapi.co/{ip}/json/` for geolocation (city, country), and parses
+  `User-Agent` with `ua-parser-js` for browser/OS/device.
+- Sends a formatted HTML email via **Resend** (`resend` npm package).
+- **De-duplication:** one email per IP per 10 minutes (in-memory Map). Page
+  refreshes within that window are silently skipped.
+- All errors are swallowed — this never blocks page load.
+
+Required Vercel env vars:
+
+```env
+RESEND_API_KEY=re_...         # https://resend.com → free 100 emails/day
+NOTIFY_EMAIL=pabbisettyssivakumar@gmail.com
+```
+
+If `RESEND_API_KEY` is not set, the route returns `200 OK` immediately (no-op).
+This means local dev works fine without the key — just no emails.
 
 ## Validation Already Done
 
