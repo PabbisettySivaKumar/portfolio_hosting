@@ -153,7 +153,7 @@ export async function POST(req: NextRequest) {
 </html>`;
 
     await resend.emails.send({
-      from: "Portfolio Tracker <onboarding@resend.dev>",
+      from: "Portfolio Tracker <notify@sivakumar.dev>",
       to: NOTIFY_EMAIL,
       subject,
       html,
