@@ -34,8 +34,14 @@ export default function Header() {
   }, []);
 
   const handleNavClick = (e: React.MouseEvent, href: string, sectionId: string) => {
+    const isHome = window.location.pathname === "/" || window.location.pathname === "/home";
+    if (!isHome) {
+      setMobileOpen(false);
+      return; // Let standard link transition handle returning to the homepage hash
+    }
     e.preventDefault();
     scrollToSection(sectionId, href);
+    setMobileOpen(false);
   };
 
   return (
