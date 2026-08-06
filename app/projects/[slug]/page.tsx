@@ -3,6 +3,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { projectDetails } from "@/app/data/portfolio";
 import type { Metadata } from "next";
+import Header from "@/components/Header";
 
 type Props = { params: Promise<{ slug: string }> };
 
@@ -31,23 +32,10 @@ export default async function ProjectDetailPage({ params }: Props) {
       <div className="absolute top-0 inset-x-0 h-[600px] grid-bg opacity-30 pointer-events-none" />
       <div className="absolute top-0 left-1/4 w-[500px] h-[500px] bg-amber-500/5 rounded-full filter blur-[120px] pointer-events-none" />
       
-      {/* ── Top nav ── */}
-      <header className="sticky top-0 z-50 border-b border-stone-800/60 bg-[#0b0b0a]/80 backdrop-blur-md">
-        <div className="max-w-5xl mx-auto px-5 sm:px-8 h-14 flex items-center justify-between">
-          <Link
-            href="/#projects"
-            className="group inline-flex items-center gap-2 text-sm text-stone-400 hover:text-stone-100 transition-colors"
-          >
-            <Lucide.ArrowLeft className="w-4 h-4 transition-transform group-hover:-translate-x-1" />
-            Back to portfolio
-          </Link>
-          <span className="hidden sm:block font-mono text-xs text-stone-600">
-            /{slug}
-          </span>
-        </div>
-      </header>
+      {/* ── Top Nav Header ── */}
+      <Header />
 
-      <main className="max-w-5xl mx-auto px-5 sm:px-8 py-16 sm:py-24 space-y-24 relative">
+      <main className="max-w-5xl mx-auto px-5 sm:px-8 pt-28 pb-16 sm:pt-36 sm:pb-24 space-y-24 relative">
 
         {/* ── Hero ── */}
         <section className="relative">
