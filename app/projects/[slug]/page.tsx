@@ -1,4 +1,4 @@
-import { ArrowLeft, Briefcase, Calendar, ChevronRight } from "lucide-react";
+import * as Lucide from "lucide-react";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { projectDetails } from "@/app/data/portfolio";
@@ -38,7 +38,7 @@ export default async function ProjectDetailPage({ params }: Props) {
             href="/#projects"
             className="group inline-flex items-center gap-2 text-sm text-stone-400 hover:text-stone-100 transition-colors"
           >
-            <ArrowLeft className="w-4 h-4 transition-transform group-hover:-translate-x-1" />
+            <Lucide.ArrowLeft className="w-4 h-4 transition-transform group-hover:-translate-x-1" />
             Back to portfolio
           </Link>
           <span className="hidden sm:block font-mono text-xs text-stone-600">
@@ -54,9 +54,9 @@ export default async function ProjectDetailPage({ params }: Props) {
           {/* Breadcrumb */}
           <div className="flex items-center gap-1.5 text-xs font-mono text-stone-600 mb-6">
             <span>portfolio</span>
-            <ChevronRight className="w-3 h-3" />
+            <Lucide.ChevronRight className="w-3 h-3" />
             <span>projects</span>
-            <ChevronRight className="w-3 h-3" />
+            <Lucide.ChevronRight className="w-3 h-3" />
             <span className="text-amber-500">{slug}</span>
           </div>
 
@@ -72,14 +72,14 @@ export default async function ProjectDetailPage({ params }: Props) {
             <div className="space-y-1">
               <span className="text-[10px] font-mono text-stone-500 uppercase tracking-wider block">Company</span>
               <span className="text-sm font-semibold text-stone-200 flex items-center gap-1.5">
-                <Briefcase className="w-4 h-4 text-amber-500/80" />
+                <Lucide.Briefcase className="w-4 h-4 text-amber-500/80" />
                 {project.company}
               </span>
             </div>
             <div className="space-y-1 border-t sm:border-t-0 sm:border-l border-stone-800/80 pt-4 sm:pt-0 sm:pl-6">
               <span className="text-[10px] font-mono text-stone-500 uppercase tracking-wider block">Timeline</span>
               <span className="text-sm font-semibold text-stone-200 flex items-center gap-1.5">
-                <Calendar className="w-4 h-4 text-amber-500/80" />
+                <Lucide.Calendar className="w-4 h-4 text-amber-500/80" />
                 {project.period}
               </span>
             </div>
@@ -152,10 +152,15 @@ export default async function ProjectDetailPage({ params }: Props) {
                 {/* Top gradient line */}
                 <div className="absolute top-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-amber-500/30 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
                 <div className="flex items-start gap-5">
-                  <span className="flex-shrink-0 font-mono text-xs text-amber-500/70 bg-amber-500/5 border border-amber-500/20 rounded-md px-2.5 py-1.5 mt-0.5">
-                    {step.phase}
-                  </span>
-                  <div>
+                  <div className="flex-shrink-0 flex flex-col items-center gap-1.5">
+                    <div className="w-10 h-10 rounded-lg bg-stone-900 border border-stone-800 flex items-center justify-center group-hover:border-amber-500/40 group-hover:bg-amber-500/5 transition-colors">
+                      <StepIcon name={step.icon} />
+                    </div>
+                    <span className="font-mono text-[10px] text-stone-500 tracking-wider">
+                      PHASE {step.phase}
+                    </span>
+                  </div>
+                  <div className="pt-1">
                     <h3 className="text-base font-semibold text-stone-100 mb-2">
                       {step.title}
                     </h3>
@@ -195,7 +200,7 @@ export default async function ProjectDetailPage({ params }: Props) {
             href="/#projects"
             className="inline-flex items-center gap-2 text-sm text-stone-400 hover:text-stone-100 transition-colors"
           >
-            <ArrowLeft className="w-4 h-4" />
+            <Lucide.ArrowLeft className="w-4 h-4" />
             Back to portfolio
           </Link>
           <span className="text-xs font-mono text-stone-700">sivakumar.dev</span>
@@ -214,6 +219,31 @@ function SectionLabel({ children }: { children: React.ReactNode }) {
       {children}
     </div>
   );
+}
+
+function StepIcon({ name }: { name?: string }) {
+  switch (name) {
+    case "terminal":
+      return <Lucide.Terminal className="w-5 h-5 text-amber-400" />;
+    case "settings":
+      return <Lucide.Settings className="w-5 h-5 text-amber-400" />;
+    case "crop":
+      return <Lucide.Crop className="w-5 h-5 text-amber-400" />;
+    case "wand":
+      return <Lucide.Wand2 className="w-5 h-5 text-amber-400" />;
+    case "database":
+      return <Lucide.Database className="w-5 h-5 text-amber-400" />;
+    case "download-cloud":
+      return <Lucide.Download className="w-5 h-5 text-amber-400" />;
+    case "file-json":
+      return <Lucide.FileJson className="w-5 h-5 text-amber-400" />;
+    case "check-square":
+      return <Lucide.CheckSquare className="w-5 h-5 text-amber-400" />;
+    case "file-spreadsheet":
+      return <Lucide.FileSpreadsheet className="w-5 h-5 text-amber-400" />;
+    default:
+      return <Lucide.Code className="w-5 h-5 text-amber-400" />;
+  }
 }
 
 function ArchDiagram({

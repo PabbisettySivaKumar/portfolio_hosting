@@ -93,7 +93,7 @@ export const projects = [
 export type ArchNode = { id: string; label: string; sublabel?: string };
 export type ArchEdge = { from: string; to: string; label?: string };
 export type TechItem = { name: string; role: string; why: string };
-export type Step = { phase: string; title: string; description: string };
+export type Step = { phase: string; title: string; description: string; icon?: string };
 
 export type ProjectDetail = {
   slug: string;
@@ -129,26 +129,31 @@ export const projectDetails: Record<string, ProjectDetail> = {
         phase: "01",
         title: "Request Parsing and Validation",
         description: "The controller authenticates the client, parses the multipart/form-data payload containing the subject image and the text prompt, and prepares the image bytes for processing in memory using BytesIO.",
+        icon: "terminal",
       },
       {
         phase: "02",
         title: "Dynamic Config via Langfuse",
         description: "To avoid baking model configs and prompts in code, the orchestrator pulls live prompt template configurations and model hyperparameters directly from Langfuse at runtime.",
+        icon: "settings",
       },
       {
         phase: "03",
         title: "Background Removal & Canvas Placement",
         description: "The pipeline uses the rembg library to isolate the subject from the input image. It then initializes a 16:9 canvas (2048px width) and places the isolated subject onto it, dynamically scaling and centering the subject to leave natural margins.",
+        icon: "crop",
       },
       {
         phase: "04",
         title: "Inpainting with Google GenAI",
         description: "The composite canvas along with the text prompt is passed to Google's GenAI model. The model runs inpainting/outpainting to fill the blank areas of the canvas, blending the subject seamlessly into the newly generated background.",
+        icon: "wand",
       },
       {
         phase: "05",
         title: "AWS S3 Storage",
         description: "The generated high-resolution banner image is saved to AWS S3 using a tenancy-structured folder structure (`env/tenant/dir/gen_uuid.png`), and the S3 key is returned to the client.",
+        icon: "database",
       },
     ],
     techStack: [
@@ -206,21 +211,25 @@ export const projectDetails: Record<string, ProjectDetail> = {
         phase: "01",
         title: "Robust Reddit Ingestion",
         description: "An ingestion layer queries Reddit search endpoints for keywords. It features custom rate-limit prevention, retry limits, and exponential backoff to handle Reddit's API limits. De-duplicated posts and recursively parsed comment trees are mapped by keyword and indexed directly in MongoDB.",
+        icon: "download-cloud",
       },
       {
         phase: "02",
         title: "JSON Schema Post Classification",
         description: "The pipeline groups posts into batches and uses structured LLM calls with JSON Mode to analyze brand intent. It evaluates sentiment, intent categories (complaint, comparison, purchase intent), and marks posts as 'high-intent questions' using key trigger phrases.",
+        icon: "file-json",
       },
       {
         phase: "03",
         title: "Comment Quality & Relevance Audits",
         description: "The system matches parent posts against comment trees to verify comment relevance and evaluate answer quality. If a comment is marked as irrelevant, the LLM generates a suggested relevant comment rewrite, enabling automated moderation or response templates.",
+        icon: "check-square",
       },
       {
         phase: "04",
         title: "Multi-Sheet Excel Reporting",
         description: "FastAPI generates a StreamingResponse using Pandas ExcelWriter and BytesIO, enabling the client to download a formatted, multi-sheet spreadsheet (`_analysis.xlsx`) matching the target keywords instantly.",
+        icon: "file-spreadsheet",
       },
     ],
     techStack: [
