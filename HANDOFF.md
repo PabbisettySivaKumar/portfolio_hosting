@@ -136,8 +136,14 @@ port/                              (plain folder, NOT a git repo)
 
 ```txt
 siva-portfolio    origin -> https://github.com/PabbisettySivaKumar/portfolio_hosting.git
-portfolio-rag-api origin -> https://huggingface.co/spaces/psk95/portfolio-rag-api
+portfolio-rag-api origin -> https://huggingface.co/spaces/psk95/portfolio-rag-api  (fetch + deploy push)
+               -> https://github.com/PabbisettySivaKumar/portfolio-rag-api.git      (backup push)
+portfolio-rag-api github -> https://github.com/PabbisettySivaKumar/portfolio-rag-api.git
 ```
+
+`git push origin main` in `portfolio-rag-api` pushes to **both** Hugging Face (triggers a Space
+rebuild) and GitHub (tracks commit history) in a single command. The `github` remote is available
+as a standalone for fetch/pull from GitHub if needed.
 
 Note: the `portfolio-rag-api` folder **is** the Hugging Face Space clone. Earlier
 handoff notes referred to a nested `backend/portfolio-rag-api` clone; that no
