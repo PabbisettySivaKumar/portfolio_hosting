@@ -107,13 +107,13 @@ export default async function ProjectDetailPage({ params }: Props) {
             End-to-end data flow through the pipeline.
           </p>
           {project.archImage ? (
-            <div className="rounded-xl border border-stone-800 bg-[#111110] p-4 sm:p-6 overflow-hidden flex items-center justify-center">
-              <div className="relative w-full max-w-2xl group cursor-zoom-in overflow-auto max-h-[600px] rounded-lg">
+            <div className="rounded-xl border border-stone-800 bg-[#111110] p-4 sm:p-6 flex items-center justify-center">
+              <div className="relative w-full max-w-2xl group rounded-lg">
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img
                   src={project.archImage}
                   alt={`${project.title} Architecture`}
-                  className="w-full h-auto object-contain mx-auto transition-transform duration-300 group-hover:scale-[1.02]"
+                  className="w-full h-auto object-contain mx-auto transition-transform duration-300 group-hover:scale-[1.01]"
                 />
               </div>
             </div>
