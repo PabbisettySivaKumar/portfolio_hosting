@@ -182,7 +182,7 @@ export const projectDetails: Record<string, ProjectDetail> = {
     period: "Nov 2025 — Mar 2026",
     tags: ["FastAPI", "Python", "LLM API", "MongoDB", "Pandas", "REST API"],
     overview: [
-      "The Reddit Brand Monitor POC is a backend analytics pipeline built on FastAPI. It allows brands to track mentions, measure public sentiment, detect high-intent buying signals, and evaluate community discussions in real time.",
+      "The Reddit Brand Monitor Service is a backend analytics pipeline built on FastAPI. It allows brands to track mentions, measure public sentiment, detect high-intent buying signals, and evaluate community discussions in real time.",
       "The system handles data ingestion by scanning subreddits for specific keywords using a rate-limit-aware HTTP fetch client with retries and exponential backoff. It can retrieve both main posts and comment trees down to several nesting levels. Raw data is cached in MongoDB, which stores collections for raw posts, raw comments, post insights, overall summaries, and comment evaluations.",
       "The analysis engine batches text feeds and calls an LLM completion service (using LiteLLM or direct endpoints with JSON Schema formats). It extracts sentiment scoring, category classification (e.g. comparison, complaint, recommendation), and intent indicators. For comments, the engine analyzes whether they accurately answer the parent post and suggest custom rewrites if the post's relevance is weak. Analysts can stream multi-sheet Excel reports containing full evaluations directly from the service.",
     ],
