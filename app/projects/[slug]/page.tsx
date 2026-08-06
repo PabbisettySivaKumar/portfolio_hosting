@@ -26,15 +26,19 @@ export default async function ProjectDetailPage({ params }: Props) {
   if (!project) notFound();
 
   return (
-    <div className="min-h-screen bg-[#0b0b0a] text-stone-300 font-sans antialiased selection:bg-amber-500/30 selection:text-amber-50">
+    <div className="min-h-screen bg-[#0b0b0a] text-stone-300 font-sans antialiased selection:bg-amber-500/30 selection:text-amber-50 relative overflow-x-hidden">
+      {/* Ambient background glows */}
+      <div className="absolute top-0 inset-x-0 h-[600px] grid-bg opacity-30 pointer-events-none" />
+      <div className="absolute top-0 left-1/4 w-[500px] h-[500px] bg-amber-500/5 rounded-full filter blur-[120px] pointer-events-none" />
+      
       {/* ── Top nav ── */}
       <header className="sticky top-0 z-50 border-b border-stone-800/60 bg-[#0b0b0a]/80 backdrop-blur-md">
         <div className="max-w-5xl mx-auto px-5 sm:px-8 h-14 flex items-center justify-between">
           <Link
             href="/#projects"
-            className="inline-flex items-center gap-2 text-sm text-stone-400 hover:text-stone-100 transition-colors"
+            className="group inline-flex items-center gap-2 text-sm text-stone-400 hover:text-stone-100 transition-colors"
           >
-            <ArrowLeft className="w-4 h-4" />
+            <ArrowLeft className="w-4 h-4 transition-transform group-hover:-translate-x-1" />
             Back to portfolio
           </Link>
           <span className="hidden sm:block font-mono text-xs text-stone-600">
@@ -43,10 +47,10 @@ export default async function ProjectDetailPage({ params }: Props) {
         </div>
       </header>
 
-      <main className="max-w-5xl mx-auto px-5 sm:px-8 py-16 sm:py-24 space-y-24">
+      <main className="max-w-5xl mx-auto px-5 sm:px-8 py-16 sm:py-24 space-y-24 relative">
 
         {/* ── Hero ── */}
-        <section>
+        <section className="relative">
           {/* Breadcrumb */}
           <div className="flex items-center gap-1.5 text-xs font-mono text-stone-600 mb-6">
             <span>portfolio</span>
@@ -59,20 +63,32 @@ export default async function ProjectDetailPage({ params }: Props) {
           <h1 className="text-3xl sm:text-5xl font-semibold tracking-tight text-stone-100 leading-tight mb-4">
             {project.title}
           </h1>
-          <p className="text-lg text-stone-400 max-w-2xl leading-relaxed mb-8">
+          <p className="text-lg text-stone-400 max-w-2xl leading-relaxed mb-10">
             {project.tagline}
           </p>
 
-          {/* Meta row */}
-          <div className="flex flex-wrap items-center gap-4 text-sm text-stone-500">
-            <span className="flex items-center gap-1.5">
-              <Briefcase className="w-3.5 h-3.5 text-amber-500/80" />
-              {project.company}
-            </span>
-            <span className="flex items-center gap-1.5">
-              <Calendar className="w-3.5 h-3.5 text-amber-500/80" />
-              {project.period}
-            </span>
+          {/* Quick Specs Dashboard */}
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 border border-stone-800/80 rounded-xl p-5 bg-[#111110]/50 backdrop-blur-sm">
+            <div className="space-y-1">
+              <span className="text-[10px] font-mono text-stone-500 uppercase tracking-wider block">Company</span>
+              <span className="text-sm font-semibold text-stone-200 flex items-center gap-1.5">
+                <Briefcase className="w-4 h-4 text-amber-500/80" />
+                {project.company}
+              </span>
+            </div>
+            <div className="space-y-1 border-t sm:border-t-0 sm:border-l border-stone-800/80 pt-4 sm:pt-0 sm:pl-6">
+              <span className="text-[10px] font-mono text-stone-500 uppercase tracking-wider block">Timeline</span>
+              <span className="text-sm font-semibold text-stone-200 flex items-center gap-1.5">
+                <Calendar className="w-4 h-4 text-amber-500/80" />
+                {project.period}
+              </span>
+            </div>
+            <div className="space-y-1 border-t sm:border-t-0 sm:border-l border-stone-800/80 pt-4 sm:pt-0 sm:pl-6">
+              <span className="text-[10px] font-mono text-stone-500 uppercase tracking-wider block">Focus Area</span>
+              <span className="text-sm font-semibold text-stone-200">
+                {slug === "txt2img" ? "Generative Media & Pipelines" : "NLP & Real-Time Aggregations"}
+              </span>
+            </div>
           </div>
 
           {/* Tags */}
