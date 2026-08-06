@@ -103,8 +103,9 @@ export type ProjectDetail = {
   period: string;
   tags: string[];
   overview: string[];
-  archNodes: ArchNode[];
-  archEdges: ArchEdge[];
+  archNodes?: ArchNode[];
+  archEdges?: ArchEdge[];
+  archImage?: string;
   steps: Step[];
   techStack: TechItem[];
 };
@@ -113,74 +114,66 @@ export const projectDetails: Record<string, ProjectDetail> = {
   "txt2img": {
     slug: "txt2img",
     title: "Multimodal Text-to-Image Pipeline",
-    tagline: "Provider-agnostic image generation with structured prompt optimization and LiteLLM routing.",
+    tagline: "Background isolation and automated dynamic banner generation using in-memory processing.",
     company: "Dotkonnekt",
     period: "Nov 2025 — Mar 2026",
-    tags: ["Python", "LiteLLM", "Gemini", "FastAPI", "Prompt Engineering"],
+    tags: ["Python", "rembg", "Google GenAI", "AWS S3", "Langfuse"],
     overview: [
-      "At Dotkonnekt, we needed a scalable image generation service that could work across multiple AI providers without lock-in. The challenge was that each provider — Gemini Imagen, Stability AI, DALL-E — has different API shapes, prompt expectations, and quality characteristics.",
-      "I designed and built a provider-agnostic pipeline that abstracts all image generation behind a single FastAPI interface. At its core, a Gemini-powered prompt optimizer enriches raw user inputs into structured, model-optimized prompts before routing them through LiteLLM to the appropriate backend.",
-      "The result was a system that could be switched between providers by changing a single config value, with consistent prompt quality and no changes required in downstream services.",
+      "At Dotkonnekt, we built an automated graphic banner generation system for campaign promotion. The main goal was to allow merchants to provide a subject image and a prompt, automatically isolating the subject from its original background, and then dynamically embedding it on a formatted canvas surrounded by a high-quality AI-generated setting.",
+      "I designed and built the complete backend pipeline in Python. When a client submits a multipart request containing the raw image and prompt, a controller parses and validates the input. The orchestrator calls Langfuse to retrieve the optimized model configuration and prompt template, ensuring dynamic tuning without redeploying code.",
+      "The core processing occurs in an in-memory image pipeline (BytesIO): the subject background is stripped using the rembg library, placed onto a 16:9 2048px blank canvas using dynamic scaling algorithms, and passed to a Google GenAI model (e.g. Imagen) to generate the surrounding background. The output is stored on AWS S3 and its key is returned to the client.",
     ],
-    archNodes: [
-      { id: "input", label: "User Input", sublabel: "Raw text prompt" },
-      { id: "optimizer", label: "Prompt Optimizer", sublabel: "Gemini Flash" },
-      { id: "router", label: "Provider Router", sublabel: "LiteLLM" },
-      { id: "generator", label: "Image Generator", sublabel: "Gemini Imagen / Stability AI" },
-      { id: "api", label: "FastAPI Response", sublabel: "Base64 / URL output" },
-    ],
-    archEdges: [
-      { from: "input", to: "optimizer", label: "raw prompt" },
-      { from: "optimizer", to: "router", label: "structured prompt" },
-      { from: "router", to: "generator", label: "provider call" },
-      { from: "generator", to: "api", label: "image bytes" },
-    ],
+    archImage: "/projects/txt2img-architecture.png",
     steps: [
       {
         phase: "01",
-        title: "Provider Abstraction with LiteLLM",
-        description: "The first step was eliminating provider-specific code. LiteLLM gives a unified completion-style interface for image models. I configured a routing table mapping model aliases (e.g. 'fast', 'quality') to actual provider+model strings, allowing instant provider swaps via environment config.",
+        title: "Request Parsing and Validation",
+        description: "The controller authenticates the client, parses the multipart/form-data payload containing the subject image and the text prompt, and prepares the image bytes for processing in memory using BytesIO.",
       },
       {
         phase: "02",
-        title: "Structured Prompt Optimization",
-        description: "Raw user prompts like 'a futuristic city' are too vague for image models. I built a Gemini Flash-powered optimizer that expands the prompt into a structured format: subject, style, lighting, camera angle, and negative keywords. This was the single biggest quality improvement — optimized prompts consistently produced sharper, more coherent images.",
+        title: "Dynamic Config via Langfuse",
+        description: "To avoid baking model configs and prompts in code, the orchestrator pulls live prompt template configurations and model hyperparameters directly from Langfuse at runtime.",
       },
       {
         phase: "03",
-        title: "FastAPI Service with Async Generation",
-        description: "The pipeline is exposed as a REST API built on FastAPI with fully async request handling. Each generation request creates an async task chain: validate → optimize → route → generate → return. This allowed the service to handle concurrent generation requests without blocking.",
+        title: "Background Removal & Canvas Placement",
+        description: "The pipeline uses the rembg library to isolate the subject from the input image. It then initializes a 16:9 canvas (2048px width) and places the isolated subject onto it, dynamically scaling and centering the subject to leave natural margins.",
       },
       {
         phase: "04",
-        title: "Fallback and Error Handling",
-        description: "Image generation APIs are notoriously unreliable — rate limits, content policy rejections, and provider outages are common. I implemented a fallback chain: if the primary provider fails, LiteLLM automatically retries with the secondary. Content policy rejections are caught and returned as structured error objects with a reason field.",
+        title: "Inpainting with Google GenAI",
+        description: "The composite canvas along with the text prompt is passed to Google's GenAI model. The model runs inpainting/outpainting to fill the blank areas of the canvas, blending the subject seamlessly into the newly generated background.",
+      },
+      {
+        phase: "05",
+        title: "AWS S3 Storage",
+        description: "The generated high-resolution banner image is saved to AWS S3 using a tenancy-structured folder structure (`env/tenant/dir/gen_uuid.png`), and the S3 key is returned to the client.",
       },
     ],
     techStack: [
       {
-        name: "LiteLLM",
-        role: "Provider router and unified API layer",
-        why: "It gave us a single interface for all image providers, reducing provider-specific code to zero. Switching from Gemini Imagen to Stability AI became a one-line config change.",
+        name: "rembg",
+        role: "Background isolation",
+        why: "A lightweight, Python-based U2Net library that runs locally to isolate subjects from original image backgrounds efficiently.",
       },
       {
-        name: "Gemini Flash",
-        role: "Prompt optimizer",
-        why: "Fast, cheap, and excellent at following structured output instructions. Used specifically for the prompt enrichment step — latency matters here since it's a pre-generation step.",
+        name: "Google GenAI (Imagen)",
+        role: "Outpainting & banner generation",
+        why: "Provides state-of-the-art outpainting capabilities, accurately blending the custom canvas structure with high-resolution generated background scenes.",
       },
       {
-        name: "FastAPI",
-        role: "API framework",
-        why: "Native async support and Pydantic-based request validation made it ideal for a pipeline where every step is an async I/O call.",
+        name: "Langfuse",
+        role: "Prompt and model configuration management",
+        why: "Enables instant tweaking of the base generation prompt and model hyper-parameters without code redeploys, keeping operations highly agile.",
       },
       {
-        name: "Python",
-        role: "Pipeline orchestration",
-        why: "The ecosystem for AI/ML tooling is unmatched in Python. All major model SDKs, LiteLLM, and async libraries are first-class.",
+        name: "AWS S3",
+        role: "Asset storage",
+        why: "Secure, durable, and highly available storage for the final generated image banners, keeping filenames clean with unique UUID structures.",
       },
     ],
   },
-
   "reddit": {
     slug: "reddit",
     title: "AI-Powered Reddit Analytics Pipeline",
