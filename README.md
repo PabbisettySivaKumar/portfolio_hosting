@@ -36,12 +36,17 @@ npm run build
 
 ## Environment
 ```env
-# .env.local — the RAG backend the chatbot calls
-NEXT_PUBLIC_CHAT_API_URL=http://127.0.0.1:8000        # local
+# .env.local
+NEXT_PUBLIC_CHAT_API_URL=http://127.0.0.1:8000        # local RAG backend
 # production (Vercel): https://psk95-portfolio-rag-api.hf.space
+
+# Visitor Notifications & Analytics
+RESEND_API_KEY=re_...
+NOTIFY_EMAIL=pabbisettyssivakumar@gmail.com
+MONGODB_URI=mongodb+srv://<username>:<password>@cluster.mongodb.net/portfolio?retryWrites=true&w=majority
 ```
-Only this public var is needed — never put Gemini/Neo4j/Langfuse secrets in the
-frontend; those live on the backend.
+Visited logs, total visits count, and daily visit metrics are stored in MongoDB Atlas and reported via Resend email notifications. The website UI renders no site counters.
+
 
 ## Deployment
 Pushed to GitHub → auto-deployed by **Vercel**. Set `NEXT_PUBLIC_CHAT_API_URL`

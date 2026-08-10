@@ -4,7 +4,15 @@ This document summarizes the current state of the portfolio project so another A
 assistant or developer can continue from here. It reflects the **actual on-disk
 layout** as of the latest update.
 
+## Update (2026-08-11) — Visitor Analytics & MongoDB Persistence
+
+- **MongoDB Integration (`lib/mongodb.ts`)**: Integrated MongoDB Atlas database persistence for site visits (`portfolio.visits` collection).
+- **Visit Counters**: Calculates **Total Visits (All-Time)** and **Visits Today (Over the Day)** dynamically on each new visit.
+- **Enhanced Email Notifications (`app/api/visit/route.ts`)**: Resend emails now include visual stats cards for Total & Daily visits and total count in subject line.
+- **Hidden Site Counter**: Website UI remains clean with zero public site counters displayed.
+
 ## Update (2026-08-05) — read this first
+
 
 The backend has advanced significantly since the bulk of this doc was written.
 **`portfolio-rag-api/HANDOFF.md` is now the authoritative reference for the
@@ -676,37 +684,37 @@ Deferred / optional (not needed at current single-container scale):
 - Inline answer citations (map shown sources to specific claims).
 - Batched embedding in ingest (negligible at the current corpus size).
 
-### 11. Visitor Email Notifications
+### 11. Visitor Email Notifications & Database Storage (MongoDB)
 
-Every time someone visits the portfolio, a silent email is sent to `pabbisettyssivakumar@gmail.com`.
+Every time someone visits the portfolio, a silent email is sent to `pabbisettyssivakumar@gmail.com` with real-time visit analytics, while preserving a clean UI with no site counters on the website.
 
 Key files:
 
 ```txt
-siva-portfolio/app/api/visit/route.ts  ← API route that sends the email
+siva-portfolio/app/api/visit/route.ts  ← API route that handles DB persistence, stats & email
+siva-portfolio/lib/mongodb.ts          ← MongoDB connection pooling helper for Next.js App Router
 siva-portfolio/app/page.tsx            ← fires a fire-and-forget POST on mount
 ```
 
 How it works:
-- `page.tsx` fires `POST /api/visit` invisibly on first mount (`useEffect`, `[]`). The
-  visitor never sees anything.
-- The API route reads the `X-Forwarded-For` header to get the client IP, calls
-  `https://ipapi.co/{ip}/json/` for geolocation (city, country), and parses
-  `User-Agent` with `ua-parser-js` for browser/OS/device.
-- Sends a formatted HTML email via **Resend** (`resend` npm package).
-- **De-duplication:** one email per IP per 10 minutes (in-memory Map). Page
-  refreshes within that window are silently skipped.
-- All errors are swallowed — this never blocks page load.
+- `page.tsx` fires `POST /api/visit` invisibly on first mount (`useEffect`, `[]`). The visitor never sees anything.
+- **De-duplication:** one visit log & email per IP per 10 minutes (in-memory Map). Page refreshes within that window are silently skipped.
+- The API route reads the `X-Forwarded-For` header to get the client IP, calls `https://ipapi.co/{ip}/json/` for geolocation (city, country), and parses `User-Agent` with `ua-parser-js` for browser/OS/device.
+- **MongoDB Persistence (`lib/mongodb.ts`)**: Saves each new visit document into MongoDB collection `portfolio.visits` containing IP, location, device, browser, OS, page URL, referrer, and timestamp.
+- **Real-Time Counters**: Calculates **Total Visits (All-Time)** via `countDocuments()` and **Visits Today (Over the Day)** starting from midnight IST (`Asia/Kolkata`).
+- **Resend Email Notification**: Sends a formatted HTML email containing a stats card for Total & Daily visits, along with total count in the email subject line.
+- All errors are swallowed — database or email notification failures never block page load.
 
 Required Vercel env vars:
 
 ```env
 RESEND_API_KEY=re_...         # https://resend.com → free 100 emails/day
 NOTIFY_EMAIL=pabbisettyssivakumar@gmail.com
+MONGODB_URI=mongodb+srv://<username>:<password>@cluster.mongodb.net/portfolio?retryWrites=true&w=majority
 ```
 
-If `RESEND_API_KEY` is not set, the route returns `200 OK` immediately (no-op).
-This means local dev works fine without the key — just no emails.
+If `RESEND_API_KEY` or `MONGODB_URI` is not set, the route safely falls back without throwing exceptions.
+
 
 ## Validation Already Done
 
