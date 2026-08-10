@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { Resend } from "resend";
 import { UAParser } from "ua-parser-js";
+import { getMongoClient } from "@/lib/mongodb";
 
 const NOTIFY_EMAIL = process.env.NOTIFY_EMAIL ?? "pabbisettyssivakumar@gmail.com";
 
@@ -111,7 +112,48 @@ export async function POST(req: NextRequest) {
     const locationStr = [geo.city, geo.region, geo.country].filter(Boolean).join(", ");
     const timeIST = formatISTTime();
 
-    const subject = `👋 New Portfolio Visit — ${locationStr}`;
+    // Database operations: save visit & calculate total and daily counts
+    let totalVisits: number | string = "N/A";
+    let visitsToday: number | string = "N/A";
+
+    try {
+      const mongoClient = await getMongoClient();
+      if (mongoClient) {
+        const db = mongoClient.db();
+        const visitsCollection = db.collection("visits");
+
+        const now = new Date();
+        await visitsCollection.insertOne({
+          ip,
+          location: geo,
+          locationStr,
+          device: deviceType,
+          browser: browserStr,
+          os: osStr,
+          pageUrl,
+          referrer,
+          timestamp: now,
+        });
+
+        totalVisits = await visitsCollection.countDocuments();
+
+        // Calculate start of today in IST (UTC+5:30)
+        const istOffsetMs = 5.5 * 60 * 60 * 1000;
+        const istNow = new Date(now.getTime() + istOffsetMs);
+        const istYear = istNow.getUTCFullYear();
+        const istMonth = istNow.getUTCMonth();
+        const istDate = istNow.getUTCDate();
+        const startOfDayIst = new Date(Date.UTC(istYear, istMonth, istDate) - istOffsetMs);
+
+        visitsToday = await visitsCollection.countDocuments({
+          timestamp: { $gte: startOfDayIst },
+        });
+      }
+    } catch (dbErr) {
+      console.error("[visit] database operation failed:", dbErr);
+    }
+
+    const subject = `👋 New Portfolio Visit — ${locationStr} (Total: ${totalVisits})`;
 
     const html = `
 <!DOCTYPE html>
@@ -125,6 +167,12 @@ export async function POST(req: NextRequest) {
     .header h1 { margin: 0; font-size: 20px; color: #0b0b0a; font-weight: 700; }
     .header p { margin: 4px 0 0; font-size: 13px; color: #44403c; }
     .body { padding: 24px 28px; }
+    .stats-card { display: flex; background: #18181b; border: 1px solid #27272a; border-radius: 8px; padding: 14px 16px; margin-bottom: 20px; }
+    .stat-item { flex: 1; text-align: center; }
+    .stat-divider { width: 1px; background: #27272a; margin: 0 12px; }
+    .stat-label { font-size: 10px; font-family: monospace; text-transform: uppercase; letter-spacing: .06em; color: #a1a1aa; }
+    .stat-value { font-size: 22px; font-weight: 700; color: #f4f4f5; margin-top: 2px; }
+    .stat-value.highlight { color: #f59e0b; }
     .row { display: flex; align-items: baseline; gap: 12px; padding: 9px 0; border-bottom: 1px solid #1c1917; }
     .row:last-child { border-bottom: none; }
     .label { font-size: 11px; font-family: monospace; text-transform: uppercase; letter-spacing: .06em; color: #78716c; min-width: 80px; }
@@ -139,6 +187,17 @@ export async function POST(req: NextRequest) {
       <p>Someone just landed on sivakumar.dev</p>
     </div>
     <div class="body">
+      <div class="stats-card">
+        <div class="stat-item">
+          <div class="stat-label">Total Visits</div>
+          <div class="stat-value">${totalVisits}</div>
+        </div>
+        <div class="stat-divider"></div>
+        <div class="stat-item">
+          <div class="stat-label">Visits Today</div>
+          <div class="stat-value highlight">${visitsToday}</div>
+        </div>
+      </div>
       <div class="row"><span class="label">📍 Location</span><span class="value">${locationStr}</span></div>
       <div class="row"><span class="label">🌐 IP</span><span class="value">${ip}</span></div>
       <div class="row"><span class="label">🖥️ Device</span><span class="value">${deviceType}</span></div>
