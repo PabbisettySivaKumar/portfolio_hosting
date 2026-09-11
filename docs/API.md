@@ -5,3 +5,9 @@
 Documented 13 public symbol(s) in `app/`.
 
 See [detailed documentation](features/app.md).
+
+## Components
+
+Documented 18 public symbol(s) in `components/`.
+
+See [detailed documentation](features/components.md).
