@@ -11,3 +11,9 @@ See [detailed documentation](features/app.md).
 Documented 18 public symbol(s) in `components/`.
 
 See [detailed documentation](features/components.md).
+
+## Core / Shared
+
+Documented 1 public symbol(s) in `core-shared/`.
+
+See [detailed documentation](features/core-shared.md).
