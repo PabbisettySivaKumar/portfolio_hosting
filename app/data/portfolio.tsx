@@ -10,7 +10,8 @@ import {
   LineChart,
   BarChartBig,
   Briefcase,
-  GraduationCap
+  GraduationCap,
+  GitPullRequest
 } from "lucide-react";
 
 export type Message = {
@@ -69,6 +70,15 @@ export const projects = [
     code: "reddit",
     href: null,
     detailSlug: "reddit",
+  },
+  {
+    title: "Auto API-Doc Sync Agent",
+    description: "Autonomous agent that detects API changes via Python AST + JS/TS heuristics and opens PRs with layered docs and Mermaid diagrams — with local-model backfill so code never leaves the machine.",
+    tech: ["Python", "FastAPI", "Gemini", "PyGithub", "Ollama"],
+    icon: GitPullRequest,
+    code: "api-doc",
+    href: "https://github.com/PabbisettySivaKumar/auto-api-doc-agent",
+    detailSlug: null,
   },
   {
     title: "Agentic RAG System with Neo4j",
